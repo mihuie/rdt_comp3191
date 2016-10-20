@@ -16,8 +16,28 @@ class Sender(BasicSender.BasicSender):
     # Main sending loop.
     def start(self):
       # add things here
-      pass
-        
+      try:
+        self.initate_con()
+      except Exception as error_msg:
+          print error_msg.args[0]
+          exit()
+      # pass
+
+    # Initate connection
+    def initate_con(self):
+        i = 0
+        while i < 10:
+            packet = self.make_packet('sin',0,'')
+            self.send(packet,(dest, port))
+            recv = self.receive(0.5)
+            if recv is not None:
+                recv_msg_type, recv_seqno, recv_data, recv_checksum = self.split_packet(recv)
+                if recv_msg_type == 'ack' and recv_seqno == 1 and recv_checksum == Checksum.generate_checksum(recv_data):
+                    self.next_to_receiver = recv_seqno
+                    return None
+            i+=1
+        raise Exception ('Unable to reach Receiver')
+
 '''
 This will be run if you run this script from the command line. You should not
 change any of this; the grader may rely on the behavior here to test your
