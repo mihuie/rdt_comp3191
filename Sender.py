@@ -18,6 +18,7 @@ class Sender(BasicSender.BasicSender):
         self.next_seqnum_to_receiver = 0
         self.msg_buffer = []
         self.running_index = 0
+        self.recv_buffer = []
 
 
     # Main sending loop.
@@ -32,13 +33,13 @@ class Sender(BasicSender.BasicSender):
             exit()
         # break file into 
         self.msg_buffer = self.make_msg(filename)
-        print len(self.msg_buffer)
+        # print len(self.msg_buffer)
         # sending packets
-        # while self.msg_buffer[self.running_index:] != []:
-        #     start = int(self.next_seqnum_to_receiver)
-        #     stop = len(self.msg_buffer[self.running_index:]) + self.initial_seqnum + 1
-        #     list_of_seqno = [x for x in range(start, stop)]
-        #     self.send_packets(self.msg_buffer[self.running_index:], list_of_seqno)
+        while self.msg_buffer[self.running_index:] != []:
+            start = int(self.next_seqnum_to_receiver)
+            stop = len(self.msg_buffer[self.running_index:]) + self.initial_seqnum + 1
+            list_of_seqno = [x for x in range(start, stop)]
+            self.send_packets(self.msg_buffer[self.running_index:], list_of_seqno)
 
     # Initate connection
     def initate_con(self):
@@ -82,13 +83,16 @@ class Sender(BasicSender.BasicSender):
     # Send MAX packets (windows size)
     def send_packets(self, msgs, seqnos):
         i = 0
+        self.recv_buffer = []
         while i < 7 and i < len(msgs):
             packet = self.make_packet('dat', seqnos[i], msgs[i])
+            # print seqnos[i],
             self.send(packet,(dest, port))
             self.running_index += 1
-            recv = self.receive(0.5)
+            self.recv_buffer.append(self.receive(0.5))
             i += 1
-            print recv
+            # print recv
+        print self.recv_buffer
 '''
 This will be run if you run this script from the command line. You should not
 change any of this; the grader may rely on the behavior here to test your
