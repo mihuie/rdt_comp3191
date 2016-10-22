@@ -16,30 +16,41 @@ class Sender(BasicSender.BasicSender):
         self.debug = debug
         self.initial_seqnum = randint(3578,5437)
         self.next_seqnum_to_receiver = 0
-        self.msg_buffer = []
         self.running_index = 0
         self.recv_buffer = []
-
+        self.msg_buffer = []
+        self.seqno_buffer = []
+        self.list_of_expected_seqno = []
 
     # Main sending loop.
     def start(self):
-        # add things here
+        # hand shake
         try:
             self.initate_con()
-            # print 'connection established'
-            # exit()
         except Exception as error_msg:
             print error_msg.args[0]
             exit()
+
         # break file into 
         self.msg_buffer = self.make_msg(filename)
-        # print len(self.msg_buffer)
+
+        # buffer seqno
+        start = self.initial_seqnum + 1
+        stop = len(self.msg_buffer) + self.initial_seqnum + 1
+        self.seqno_buffer = [x for x in range(start, stop)]
+        
         # sending packets
         while self.msg_buffer[self.running_index:] != []:
-            start = int(self.next_seqnum_to_receiver)
-            stop = len(self.msg_buffer[self.running_index:]) + self.initial_seqnum + 1
-            list_of_seqno = [x for x in range(start, stop)]
-            self.send_packets(self.msg_buffer[self.running_index:], list_of_seqno)
+            self.list_of_expected_seqno = []
+            # slicing already ack'd data off msg_buffer
+            self.send_packets(self.msg_buffer[self.running_index:], self.seqno_buffer[self.running_index:])
+            # validate recv packets
+            for x in self.recv_buffer:
+                self.validate_packet(x)
+            # update running_index to last successfully ack'd
+            self.running_index += self.list_of_expected_seqno.index(int(self.next_seqnum_to_receiver)) + 1
+
+
 
     # Initate connection
     def initate_con(self):
@@ -47,10 +58,10 @@ class Sender(BasicSender.BasicSender):
         while i < 5:
             # send initial patch to receiver
             packet = self.make_packet('syn',self.initial_seqnum,'')
-            self.next_seqnum_to_receiver = self.initial_seqnum + 1
             self.send(packet,(dest, port))
             # set timer
             recv = self.receive(0.5)
+            self.list_of_expected_seqno.append(self.initial_seqnum + 1)
             # validate data
             if self.validate_packet(recv):
                 return None
@@ -62,12 +73,20 @@ class Sender(BasicSender.BasicSender):
 
     # Validate packet is not corrupt and update next_seqnum_to_receiver
     def validate_packet(self, packet_recv):
-        if packet_recv is not None:
-            recv_msg_type, recv_seqno, recv_data, recv_checksum = self.split_packet(packet_recv)
-            if recv_msg_type == 'ack' and Checksum.validate_checksum(packet_recv) and recv_checksum != None:
-                self.next_seqnum_to_receiver = recv_seqno
-                return True
-        return False
+        # checks connection time out
+        if packet_recv is None:
+            return False
+        # check for ack and exsitence of a valid checksum
+        recv_msg_type, recv_seqno, recv_data, recv_checksum = self.split_packet(packet_recv)
+        if not(recv_msg_type == 'ack' and Checksum.validate_checksum(packet_recv) and recv_checksum != None):
+            return False
+        # checks if recv sequence number is expected
+        if int(recv_seqno) not in self.list_of_expected_seqno:
+            return False
+        # update next_seqnum_to_receiver with largest ack seqno
+        if recv_seqno > self.next_seqnum_to_receiver:
+            self.next_seqnum_to_receiver = recv_seqno
+        return True
 
     # Read and Break up file into messages
     def make_msg(self, filename):
@@ -86,13 +105,12 @@ class Sender(BasicSender.BasicSender):
         self.recv_buffer = []
         while i < 7 and i < len(msgs):
             packet = self.make_packet('dat', seqnos[i], msgs[i])
-            # print seqnos[i],
             self.send(packet,(dest, port))
-            self.running_index += 1
+            self.list_of_expected_seqno.append(seqnos[i] + 1)
             self.recv_buffer.append(self.receive(0.5))
             i += 1
-            # print recv
-        print self.recv_buffer
+        # print self.recv_buffer
+
 '''
 This will be run if you run this script from the command line. You should not
 change any of this; the grader may rely on the behavior here to test your
