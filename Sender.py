@@ -1,6 +1,3 @@
-# 03025377
-
-
 import sys
 import getopt
 
@@ -244,11 +241,6 @@ class Sender(BasicSender.BasicSender):
             i += 1
 
         self.recv_buffer = filter(None, self.recv_buffer)
-        
-        # if msg_type == 'fin':
-        #     print self.recv_buffer
-        #     print self.validated_packts
-        #     print self.seqno_buffer[-1:]
 
     # update index
     def update_running_index(self):
